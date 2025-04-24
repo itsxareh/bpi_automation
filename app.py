@@ -13,6 +13,7 @@ import io
 import tempfile
 import shutil
 import re 
+import traceback
 import msoffcrypto 
 from supabase import create_client
 from dotenv import load_dotenv
@@ -1162,64 +1163,224 @@ CAMPAIGN_CONFIG = {
 }
 
 def main():
+    # Page configuration with custom theme
     st.set_page_config(
         page_title="Automation Tool",
-        layout="wide")
-    st.title("Automation Tool")
-    st.markdown("Transform Files into CMS Format")
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Custom CSS for better UI
+    st.markdown("""
+        <style>
+        /* Main page styling */
+        .main .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        
+        /* Header styling */
+        h1 {
+            color: #1E88E5;
+            font-weight: 800;
+            font-size: 2.5rem !important;
+            margin-bottom: 0 !important;
+        }
+        h2 {
+            font-weight: 600;
+            color: #333;
+        }
+        h3 {
+            font-weight: 600;
+            font-size: 1.2rem !important;
+            color: #555;
+        }
+        
+        /* Card styling */
+        .stCard {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            background-color: white;
+        }
+        
+        /* Button styling */
+        .stButton>button {
+            border-radius: 8px;
+            font-weight: 500;
+            width: 100%;
+        }
+        
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background-color: #f8f9fa;
+            padding-top: 1.5rem;
+        }
+        [data-testid="stSidebarNav"] {
+            padding-top: 1rem;
+        }
+        
+        /* Streamlit component adjustments */
+        div[data-testid="stToolbar"] {
+            display: none;
+        }
+        div[data-testid="stFileUploaderDropzoneInstructions"] {
+            display: none;
+        }
+        section[data-testid="stFileUploaderDropzone"] {
+            padding: 0px;
+            margin: 0px;
+        }
+        button[data-testid="stBaseButton-secondary"] {
+            width: 100%;
+        }
+        
+        /* Status badges */
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .success-badge {
+            background-color: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+        }
+        .warning-badge {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #FFC107;
+        }
+        .error-badge {
+            background-color: rgba(244, 67, 54, 0.1);
+            color: #F44336;
+        }
+        
+        /* Improved file uploader */
+        .custom-file-upload {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .custom-file-upload:hover {
+            border-color: #1E88E5;
+            cursor: pointer;
+        }
+        
+        /* Divider */
+        .divider {
+            height: 1px;
+            background-color: #eee;
+            margin: 1rem 0;
+        }
+        
+        /* Section header */
+        .section-header {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6c757d;
+            margin-bottom: 0.75rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # App header with logo and title
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        st.markdown("📊")  # You can replace this with an actual logo
+    with col2:
+        st.title("Automation Tool")
+        st.markdown("<p style='font-size: 1.2rem; margin-top: -10px; color: #666;'>Transform Files into CMS Format</p>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
-    campaign = st.sidebar.selectbox("Select Campaign", ["No Campaign","BPI", "ROB Bike"], index=0)
+    # Sidebar configuration
+    st.sidebar.markdown("<h3 style='margin-bottom: 20px;'>Campaign Settings</h3>", unsafe_allow_html=True)
+    
+    # Campaign selection with better UI
+    campaign = st.sidebar.selectbox(
+        "Select Campaign",
+        ["No Campaign", "BPI", "ROB Bike"],
+        index=0,
+        format_func=lambda x: f"📁 {x}" if x != "No Campaign" else "Choose a campaign..."
+    )
+    
     config = CAMPAIGN_CONFIG[campaign]
     processor = config["processor"]()
     automation_map = config["automation_map"]
     automation_options = config["automation_options"]
-
-    st.sidebar.header("Settings")
-    automation_type = st.sidebar.selectbox("Select Automation Type", automation_options, key=f"{campaign}_automation_type")
-
-    preview = st.sidebar.checkbox("Preview file before processing", value=True, key=f"{campaign}_preview")
-    st.markdown("""
-            <style>
-            div[data-testid="stToolbar"] {
-                display: none;
-            }
-            div[data-testid="stFileUploaderDropzoneInstructions"] {
-                display: none;
-            }
-            section[data-testid="stFileUploaderDropzone"] {
-                padding: 0px;
-                margin: 0px;
-            }
-            button[data-testid="stBaseButton-secondary"] {
-                width: 100%;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-    uploaded_file = st.sidebar.file_uploader(
-        "Upload File", 
-        type=["xlsx", "xls"], 
-        key=f"{campaign}_file_uploader"
+    
+    # Make automation type selection more visual
+    st.sidebar.markdown("<div class='section-header'>AUTOMATION TYPE</div>", unsafe_allow_html=True)
+    automation_type = st.sidebar.selectbox(
+        "",
+        automation_options,
+        key=f"{campaign}_automation_type",
+        help="Select the type of automation to perform"
     )
     
+    # Better file uploader UI
+    st.sidebar.markdown("<div class='section-header'>FILE UPLOAD</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div class='custom-file-upload'>", unsafe_allow_html=True)
+    uploaded_file = st.sidebar.file_uploader(
+        "Upload Excel File",
+        type=["xlsx", "xls"],
+        key=f"{campaign}_file_uploader",
+        help="Upload an Excel file to process"
+    )
+    st.sidebar.markdown("</div>", unsafe_allow_html=True)
+    
+    preview = st.sidebar.checkbox("Preview file before processing", value=True, key=f"{campaign}_preview")
+    
+    # Special options for ROB Bike campaign
     if campaign == "ROB Bike" and automation_type == "Daily Remark Report":
-        report_date = st.sidebar.date_input('Date Report', format="MM/DD/YYYY") 
-        with st.sidebar.expander("Upload Other File", expanded=False):
-            upload_field_result = st.file_uploader(
-                "Field Result",
-                type=["xlsx", "xls"],
-                key=f"{campaign}_field_result"
-            )
-            upload_dataset = st.file_uploader(
-                "Dataset",
-                type=["xlsx", "xls"],
-                key=f"{campaign}_dataset"
-            )
-            upload_disposition = st.file_uploader(
-                "Disposition",
-                type=["xlsx", "xls"],
-                key=f"{campaign}_disposition"
-            )
+        st.sidebar.markdown("<div class='section-header'>REPORT OPTIONS</div>", unsafe_allow_html=True)
+        report_date = st.sidebar.date_input('Date Report', format="MM/DD/YYYY")
+        
+        with st.sidebar.expander("📑 Upload Other Files", expanded=False):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Field Result")
+            with col2:
+                upload_field_result = st.file_uploader(
+                    "",
+                    type=["xlsx", "xls"],
+                    key=f"{campaign}_field_result"
+                )
+            
+            st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("#### Dataset")
+            with col2:
+                upload_dataset = st.file_uploader(
+                    "",
+                    type=["xlsx", "xls"],
+                    key=f"{campaign}_dataset"
+                )
+            
+            st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("#### Disposition")
+            with col2:
+                upload_disposition = st.file_uploader(
+                    "",
+                    type=["xlsx", "xls"],
+                    key=f"{campaign}_disposition"
+                )
+        
+        # Handle Field Result Upload
         if upload_field_result:
+            st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+            st.subheader("🔍 Field Result Data")
+            
             TABLE_NAME = 'rob_bike_field_result'
             
             try:
@@ -1259,107 +1420,110 @@ def main():
 
                     df_extracted['inserted_date'] = df_extracted['inserted_date'].astype(str).replace('NaT', None)
 
-                    st.subheader("Extracted Field Result Data:")
-                    st.dataframe(df_extracted)
+                    st.dataframe(df_extracted, use_container_width=True, height=300)
                     
-                    button_placeholder = st.empty()
+                    col1, col2 = st.columns([1, 3])
+                    
+                    with col1:
+                        upload_button = st.button("📤 Upload to Database", 
+                                                key="upload_button", 
+                                                type="primary", 
+                                                use_container_width=True)
+                    
                     status_placeholder = st.empty()
                     
-                    upload_button = button_placeholder.button("Upload to Database", key="upload_button")
-                    
                     if upload_button:
-                        button_placeholder.button("Processing...", disabled=True, key="processing_button")
-                        
-                        try:
-                            existing_records_response = supabase.table(TABLE_NAME).select("chcode, status, inserted_date").execute()
-                            if hasattr(existing_records_response, 'data'):  
-                                existing_records = existing_records_response.data
-                                existing_df = pd.DataFrame(existing_records) if existing_records else pd.DataFrame()
-                            else:
-                                existing_df = pd.DataFrame()
-                            
-                            df_to_upload = df_extracted.copy()
-                            for col in df_to_upload.columns:
-                                if pd.api.types.is_datetime64_any_dtype(df_to_upload[col]):
-                                    df_to_upload[col] = df_to_upload[col].dt.strftime('%Y-%m-%d')
-
-                            df_to_upload = df_to_upload.astype(object).where(pd.notnull(df_to_upload), None)
-                            records_to_insert = df_to_upload.to_dict(orient="records")
-                            
-                            filtered_records = []
-                            total_records = len(records_to_insert)
-                            duplicate_count = 0
-                            
-                            progress_bar = st.progress(0)
-                            status_text = status_placeholder.empty()
-                            
-                            for i, record in enumerate(records_to_insert):
-                                if not existing_df.empty:
-                                    matching = existing_df[
-                                        (existing_df['chcode'] == record['chcode']) & 
-                                        (existing_df['status'] == record['status']) & 
-                                        (existing_df['inserted_date'] == record['inserted_date'])
-                                    ]
-                                    
-                                    if matching.empty:
-                                        filtered_records.append(record)
-                                    else:
-                                        duplicate_count += 1
+                        with st.spinner("Processing..."):
+                            try:
+                                existing_records_response = supabase.table(TABLE_NAME).select("chcode, status, inserted_date").execute()
+                                if hasattr(existing_records_response, 'data'):  
+                                    existing_records = existing_records_response.data
+                                    existing_df = pd.DataFrame(existing_records) if existing_records else pd.DataFrame()
                                 else:
-                                    filtered_records.append(record)
+                                    existing_df = pd.DataFrame()
                                 
-                                progress = (i + 1) / total_records
-                                progress_bar.progress(progress)
-                                status_text.text(f"Processing {i+1} of {total_records} records...")
-                            
-                            status_placeholder.info(f"Found {len(filtered_records)} unique records to insert. Skipping {duplicate_count} duplicates.")
-                            
-                            if filtered_records:
-                                batch_size = 100
-                                success_count = 0
+                                df_to_upload = df_extracted.copy()
+                                for col in df_to_upload.columns:
+                                    if pd.api.types.is_datetime64_any_dtype(df_to_upload[col]):
+                                        df_to_upload[col] = df_to_upload[col].dt.strftime('%Y-%m-%d')
+
+                                df_to_upload = df_to_upload.astype(object).where(pd.notnull(df_to_upload), None)
+                                records_to_insert = df_to_upload.to_dict(orient="records")
                                 
-                                for i in range(0, len(filtered_records), batch_size):
-                                    batch = filtered_records[i:i+batch_size]
-                                    
-                                    if batch:
-                                        response = supabase.table(TABLE_NAME).insert(batch).execute()
+                                filtered_records = []
+                                total_records = len(records_to_insert)
+                                duplicate_count = 0
+                                
+                                progress_bar = st.progress(0)
+                                status_text = status_placeholder.empty()
+                                
+                                for i, record in enumerate(records_to_insert):
+                                    if not existing_df.empty:
+                                        matching = existing_df[
+                                            (existing_df['chcode'] == record['chcode']) & 
+                                            (existing_df['status'] == record['status']) & 
+                                            (existing_df['inserted_date'] == record['inserted_date'])
+                                        ]
                                         
-                                        if hasattr(response, 'data') and response.data:
-                                            success_count += len(batch)
+                                        if matching.empty:
+                                            filtered_records.append(record)
+                                        else:
+                                            duplicate_count += 1
+                                    else:
+                                        filtered_records.append(record)
                                     
-                                    progress = min(i + batch_size, len(filtered_records)) / max(1, len(filtered_records))
+                                    progress = (i + 1) / total_records
                                     progress_bar.progress(progress)
-                                    status_text.text(f"Uploaded {success_count} of {len(filtered_records)} records...")
+                                    status_text.text(f"Processing {i+1} of {total_records} records...")
                                 
-                                st.toast(f"Field Result Updated! {success_count} unique records uploaded successfully.")
-                            else:
-                                st.warning("No new unique records to upload.")
-                            
-                            button_placeholder.button("Upload Complete!", disabled=True, key="complete_button")
+                                status_placeholder.info(f"Found {len(filtered_records)} unique records to insert. Skipping {duplicate_count} duplicates.")
                                 
-                        except Exception as e:
-                            st.error(f"Error uploading field result: {str(e)}")
-                            import traceback
-                            st.code(traceback.format_exc())
-                            
-                            button_placeholder.button("Upload Failed - Try Again", key="retry_button")
+                                if filtered_records:
+                                    batch_size = 100
+                                    success_count = 0
+                                    
+                                    for i in range(0, len(filtered_records), batch_size):
+                                        batch = filtered_records[i:i+batch_size]
+                                        
+                                        if batch:
+                                            response = supabase.table(TABLE_NAME).insert(batch).execute()
+                                            
+                                            if hasattr(response, 'data') and response.data:
+                                                success_count += len(batch)
+                                        
+                                        progress = min(i + batch_size, len(filtered_records)) / max(1, len(filtered_records))
+                                        progress_bar.progress(progress)
+                                        status_text.text(f"Uploaded {success_count} of {len(filtered_records)} records...")
+                                    
+                                    st.success(f"✅ Field Result Updated! {success_count} unique records uploaded successfully.")
+                                else:
+                                    st.warning("⚠️ No new unique records to upload.")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error uploading field result: {str(e)}")
+                                with st.expander("See error details"):
+                                    st.code(traceback.format_exc())
                 else:
                     st.error("Required columns not found in the uploaded file.")
             except Exception as e:
                 st.error(f"Error processing Excel file: {str(e)}")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
         
+        # Handle Dataset Upload with cleaner UI
         if upload_dataset:
+            st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+            st.subheader("📊 Dataset")
+            
             TABLE_NAME = 'rob_bike_dataset'
             try:
                 xls = pd.ExcelFile(upload_dataset)
                 df = pd.read_excel(xls)
                     
                 df_clean = df.replace({np.nan: 0})
-            
                 df_filtered = df_clean.copy()
                 
-                st.subheader("Uploaded Dataset:")
-                st.dataframe(df_filtered)
+                st.dataframe(df_filtered, use_container_width=True, height=300)
                 
                 possible_column_variants = {
                     'ChCode': ['ChCode'],
@@ -1391,108 +1555,142 @@ def main():
                 if len(column_mapping) == len(target_columns):
                     df_selected = df_filtered[list(column_mapping.keys())].rename(columns=column_mapping)
                     
-                    df_selected = df_selected.rename(columns=column_mapping)
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        upload_button = st.button("📤 Upload Dataset", 
+                                                key="upload_dataset_button", 
+                                                type="primary",
+                                                use_container_width=True)
                     
-                    button_placeholder = st.empty()
                     status_placeholder = st.empty()
                     
-                    upload_button = button_placeholder.button("Upload to Database", key="upload_dataset_button")
-                    
                     if upload_button:
-                        button_placeholder.button("Processing...", disabled=True, key="processing_dataset_button")
+                        with st.spinner("Processing dataset..."):
+                            try:
+                                unique_id_col = 'account_number'
+                                unique_ids = df_selected[unique_id_col].dropna().astype(str).unique().tolist()
 
-                        try:
-                            unique_id_col = 'account_number'
-                            unique_ids = df_selected[unique_id_col].dropna().astype(str).unique().tolist()
+                                for col in df_selected.columns:
+                                    if pd.api.types.is_datetime64_any_dtype(df_selected[col]):
+                                        df_selected[col] = df_selected[col].dt.strftime('%Y-%m-%d')
+                                        
+                                df_selected['account_number'] = df_selected['account_number'].astype(str).str.strip()
 
-                            for col in df_selected.columns:
-                                if pd.api.types.is_datetime64_any_dtype(df_selected[col]):
-                                    df_selected[col] = df_selected[col].dt.strftime('%Y-%m-%d')
-                                    
-                            df_selected['account_number'] = df_selected['account_number'].astype(str).str.strip()
+                                for col in ['chcode', 'client_name', 'stores', 'cluster']:
+                                    if col in df_selected.columns:
+                                        df_selected[col] = df_selected[col].astype(str).str.strip()
+                                        
+                                df_selected = df_selected.astype(object).where(pd.notnull(df_selected), None)
 
-                            for col in ['chcode', 'client_name', 'stores', 'cluster']:
-                                if col in df_selected.columns:
-                                    df_selected[col] = df_selected[col].astype(str).str.strip()
-                                    
-                            df_selected = df_selected.astype(object).where(pd.notnull(df_selected), None)
+                                new_records = df_selected.to_dict(orient="records")
 
-                            new_records = df_selected.to_dict(orient="records")
-
-                            existing_records = []
-                            batch_size_for_query = 100
-                            for i in range(0, len(unique_ids), batch_size_for_query):
-                                batch_ids = unique_ids[i:i + batch_size_for_query]
-                                try:
-                                    batch_response = supabase.table(TABLE_NAME).select("*").in_(unique_id_col, batch_ids).execute()
-                                    if hasattr(batch_response, 'data') and batch_response.data:
-                                        existing_records.extend(batch_response.data)
-                                except Exception as e:
-                                    st.warning(f"Error fetching records: {str(e)}")
-                                    
-                            existing_df = pd.DataFrame(existing_records) if existing_records else pd.DataFrame()
-                            
-                            if not existing_df.empty:
-                                existing_df['account_number'] = existing_df['account_number'].astype(str).str.strip()
+                                existing_records = []
+                                batch_size_for_query = 100
                                 
-
-                            records_to_insert = []
-                            records_to_update = []
-
-                            def clean_compare(val):
-                                if isinstance(val, float) and np.isnan(val):
-                                    return None
-                                return str(val).strip() if isinstance(val, str) else val
-
-                            def records_differ(new_rec, old_rec):
-                                for k, new_val in new_rec.items():
-                                    old_val = old_rec.get(k)
-                                    if clean_compare(new_val) != clean_compare(old_val):
-                                        return True
-                                return False
-
-                            for new_record in new_records:
-                                acc_id = new_record[unique_id_col]
-                                acc_id_str = str(acc_id).strip()
-                                match_df = existing_df[existing_df[unique_id_col].astype(str).str.strip() == acc_id_str]
+                                progress_bar = st.progress(0)
                                 
-                                if not match_df.empty:
-                                    existing_record = match_df.iloc[0].to_dict()
-                                    if records_differ(new_record, existing_record):
-                                        new_record['id'] = existing_record['id']
-                                        records_to_update.append(new_record)
+                                for i in range(0, len(unique_ids), batch_size_for_query):
+                                    batch_ids = unique_ids[i:i + batch_size_for_query]
+                                    try:
+                                        batch_response = supabase.table(TABLE_NAME).select("*").in_(unique_id_col, batch_ids).execute()
+                                        if hasattr(batch_response, 'data') and batch_response.data:
+                                            existing_records.extend(batch_response.data)
+                                    except Exception as e:
+                                        st.warning(f"Error fetching records: {str(e)}")
+                                    
+                                    # Update progress bar
+                                    progress = min((i + batch_size_for_query) / len(unique_ids), 1.0)
+                                    progress_bar.progress(progress, text="Fetching existing records...")
+                                    
+                                existing_df = pd.DataFrame(existing_records) if existing_records else pd.DataFrame()
+                                
+                                if not existing_df.empty:
+                                    existing_df['account_number'] = existing_df['account_number'].astype(str).str.strip()
+
+                                records_to_insert = []
+                                records_to_update = []
+
+                                def clean_compare(val):
+                                    if isinstance(val, float) and np.isnan(val):
+                                        return None
+                                    return str(val).strip() if isinstance(val, str) else val
+
+                                def records_differ(new_rec, old_rec):
+                                    for k, new_val in new_rec.items():
+                                        old_val = old_rec.get(k)
+                                        if clean_compare(new_val) != clean_compare(old_val):
+                                            return True
+                                    return False
+
+                                for i, new_record in enumerate(new_records):
+                                    acc_id = new_record[unique_id_col]
+                                    acc_id_str = str(acc_id).strip()
+                                    match_df = existing_df[existing_df[unique_id_col].astype(str).str.strip() == acc_id_str]
+                                    
+                                    if not match_df.empty:
+                                        existing_record = match_df.iloc[0].to_dict()
+                                        if records_differ(new_record, existing_record):
+                                            new_record['id'] = existing_record['id']
+                                            records_to_update.append(new_record)
+                                    else:
+                                        records_to_insert.append(new_record)
+                                        
+                                    # Update progress for analysis
+                                    if i % 100 == 0:
+                                        progress = min((i + 1) / len(new_records), 1.0)
+                                        progress_bar.progress(progress, text="Analyzing records...")
+
+                                # Final update processing
+                                if records_to_insert or records_to_update:
+                                    total_operations = len(records_to_insert) + len(records_to_update)
+                                    operations_done = 0
+                                    
+                                    if records_to_insert:
+                                        for i in range(0, len(records_to_insert), 100):
+                                            batch = records_to_insert[i:i+100]
+                                            try:
+                                                supabase.table(TABLE_NAME).insert(batch).execute()
+                                                operations_done += len(batch)
+                                                progress = min(operations_done / total_operations, 1.0)
+                                                progress_bar.progress(progress, text=f"Inserting records ({operations_done}/{total_operations})...")
+                                            except Exception as e:
+                                                st.error(f"Insertion error: {str(e)}")
+
+                                    for record in records_to_update:
+                                        record_id = record.pop("id", None)
+                                        if record_id:
+                                            try:
+                                                supabase.table(TABLE_NAME).update(record).eq("id", record_id).execute()
+                                                operations_done += 1
+                                                if operations_done % 10 == 0:
+                                                    progress = min(operations_done / total_operations, 1.0)
+                                                    progress_bar.progress(progress, text=f"Updating records ({operations_done}/{total_operations})...")
+                                            except Exception as e:
+                                                st.error(f"Update error (ID {record_id}): {str(e)}")
+
+                                    progress_bar.progress(1.0, text="Complete!")
+                                    st.success(f"✅ Upload complete. Inserted: {len(records_to_insert)} | Updated: {len(records_to_update)}")
                                 else:
-                                    records_to_insert.append(new_record)
+                                    st.info("ℹ️ No changes detected. Database is up to date.")
 
-                            if records_to_insert:
-                                for i in range(0, len(records_to_insert), 100):
-                                    batch = records_to_insert[i:i+100]
-                                    try:
-                                        supabase.table(TABLE_NAME).insert(batch).execute()
-                                    except Exception as e:
-                                        st.error(f"Insertion error: {str(e)}")
-
-                            for record in records_to_update:
-                                record_id = record.pop("id", None)
-                                if record_id:
-                                    try:
-                                        supabase.table(TABLE_NAME).update(record).eq("id", record_id).execute()
-                                    except Exception as e:
-                                        st.error(f"Update error (ID {record_id}): {str(e)}")
-
-                            st.success(f"Upload complete. Inserted: {len(records_to_insert)} | Updated: {len(records_to_update)}")
-
-                        except Exception as e:
-                            st.error(f"Processing error: {str(e)}")
-                            st.code(traceback.format_exc())
+                            except Exception as e:
+                                st.error(f"❌ Processing error: {str(e)}")
+                                with st.expander("See error details"):
+                                    st.code(traceback.format_exc())
                                     
                 else:
-                    missing_cols = [col for col in possible_column_variants if col not in df_filtered.columns]
-                    st.error(f"Required columns not found in the uploaded file.")
+                    missing_cols = [col for col in possible_column_variants if all(variant not in df_filtered.columns for variant in possible_column_variants[col])]
+                    st.error(f"❌ Required columns not found: {', '.join(missing_cols)}")
             except Exception as e:
-                st.error(f"Error processing Excel file: {str(e)}")
+                st.error(f"❌ Error processing Excel file: {str(e)}")
+                
+            st.markdown("</div>", unsafe_allow_html=True)
 
+        # Handle Disposition Upload with improved UI
         if upload_disposition:
+            st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+            st.subheader("📋 Disposition")
+            
             TABLE_NAME = 'rob_bike_disposition'
             try:
                 xls = pd.ExcelFile(upload_disposition)
@@ -1500,51 +1698,99 @@ def main():
                 df_clean = df.replace({np.nan: ''})
                 df_filtered = df_clean.copy()
 
-                st.subheader("Uploaded Disposition:")
-                st.dataframe(df_filtered)
+                st.dataframe(df_filtered, use_container_width=True)
 
-                button_placeholder = st.empty()
-                upload_button = button_placeholder.button("Upload to Database", key="upload_disposition_button")
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    upload_button = st.button("📤 Upload Disposition", 
+                                            key="upload_disposition_button", 
+                                            type="primary",
+                                            use_container_width=True)
 
                 if upload_button:
-                    button_placeholder.button("Processing...", disabled=True, key="processing_disposition_button")
-                    try:
-                        if 'CMS Disposition' in df_filtered.columns:
-                            unique_dispositions = df_filtered['CMS Disposition'].drop_duplicates().tolist()
-                            unique_df = pd.DataFrame({'disposition': unique_dispositions})
+                    with st.spinner("Processing disposition data..."):
+                        try:
+                            if 'CMS Disposition' in df_filtered.columns:
+                                unique_dispositions = df_filtered['CMS Disposition'].drop_duplicates().tolist()
+                                
+                                # Show the unique dispositions
+                                with st.expander("View unique dispositions"):
+                                    for idx, disp in enumerate(unique_dispositions):
+                                        st.write(f"{idx+1}. {disp}")
+                                
+                                existing_response = supabase.table(TABLE_NAME).select("disposition").execute()
+                                if existing_response.data is None:
+                                    existing_dispositions = []
+                                else:
+                                    existing_dispositions = [record['disposition'] for record in existing_response.data]
 
-                            existing_response = supabase.table(TABLE_NAME).select("disposition").execute()
-                            if existing_response.data is None:
-                                existing_dispositions = []
+                                records_to_insert = [
+                                    {"disposition": d} for d in unique_dispositions if d not in existing_dispositions
+                                ]
+
+                                if records_to_insert:
+                                    insert_response = supabase.table(TABLE_NAME).insert(records_to_insert).execute()
+                                    st.success(f"✅ Successfully added {len(records_to_insert)} new dispositions!")
+                                else:
+                                    st.info("ℹ️ No new dispositions to add; all values already exist.")
+
                             else:
-                                existing_dispositions = [record['disposition'] for record in existing_response.data]
-
-                            records_to_insert = [
-                                {"disposition": d} for d in unique_dispositions if d not in existing_dispositions
-                            ]
-
-                            if records_to_insert:
-                                insert_response = supabase.table(TABLE_NAME).insert(records_to_insert).execute()
-                                toast_placeholder = st.empty()
-                                toast_placeholder.success("Upload successful!")
-                                time.sleep(3)
-                                toast_placeholder.empty()
-                            else:
-                                st.info("No new dispositions to add; all values already exists.")
-
-                            button_placeholder.empty()
-                        else:
-                            st.error("Required columns was not found in the uploaded file.")
-                    except Exception as e:
-                        st.error(f"Error uploading disposition: {str(e)}")
-                        button_placeholder.button("Upload Failed - Try Again", key="error_disposition_button")        
+                                st.error("❌ Required column 'CMS Disposition' was not found in the uploaded file.")
+                        except Exception as e:
+                            st.error(f"❌ Error uploading disposition: {str(e)}")
+                            with st.expander("See error details"):
+                                st.code(traceback.format_exc())      
+                else:
+                    st.info("👆 Click the button above to upload disposition data")
             except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+                st.error(f"❌ An error occurred: {str(e)}")
+                
+            st.markdown("</div>", unsafe_allow_html=True)
 
+    # Data cleaning options in a nicer format
+    with st.sidebar.expander("🧹 Data Cleaning Options"):
+        remove_duplicates = st.checkbox("Remove Duplicates", value=False, key=f"{campaign}_remove_duplicates")
+        remove_blanks = st.checkbox("Remove Blanks", value=False, key=f"{campaign}_remove_blanks")
+        trim_spaces = st.checkbox("Trim Text", value=False, key=f"{campaign}_trim_spaces")
+    
+    # Data manipulation in a more visual format
+    with st.sidebar.expander("🔧 Data Manipulation Tools"):
+        st.markdown("<div class='section-header'>COLUMN OPERATIONS</div>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            enable_add_column = st.checkbox("Add Column", value=False)
+            enable_column_removal = st.checkbox("Remove Column", value=False)
+        with col2:
+            enable_column_renaming = st.checkbox("Rename Column", value=False)
+        
+        st.markdown("<div class='section-header'>ROW OPERATIONS</div>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            enable_row_filtering = st.checkbox("Filter Row", value=False)
+        with col2:
+            enable_add_row = st.checkbox("Add Row", value=False)
+        with col3:
+            enable_row_removal = st.checkbox("Remove Row", value=False)
+        
+        st.markdown("<div class='section-header'>VALUE OPERATIONS</div>", unsafe_allow_html=True)
+        enable_edit_values = st.checkbox("Edit Values", value=False)
+    
+    # Process button with better styling
+    process_button = st.sidebar.button(
+        "▶️ Process File",
+        type="primary",
+        disabled=uploaded_file is None,
+        key=f"{campaign}_process_button"
+    )
+    
+    # Main content area
     df = None
     sheet_names = []
 
     if uploaded_file is not None:
+        # Session state management
         if 'previous_filename' not in st.session_state or st.session_state['previous_filename'] != uploaded_file.name:
             if 'output_binary' in st.session_state:
                 del st.session_state['output_binary']
@@ -1555,86 +1801,76 @@ def main():
                 
             st.session_state['previous_filename'] = uploaded_file.name
         
-        with st.sidebar.expander("Data Cleaning Options"):
-            remove_duplicates = st.checkbox("Remove Duplicates", value=False, key=f"{campaign}_remove_duplicates")
-            remove_blanks = st.checkbox("Remove Blanks", value=False, key=f"{campaign}_remove_blanks")
-            trim_spaces = st.checkbox("Trim Text", value=False, key=f"{campaign}_trim_spaces")
-        
-        with st.sidebar.expander("Data Manipulation"):
-            st.markdown("#### Column Operations")
-            enable_add_column = st.checkbox("Add Column", value=False)
-            enable_column_removal = st.checkbox("Remove Column", value=False)
-            enable_column_renaming = st.checkbox("Rename Column", value=False)
-            
-            st.markdown("#### Row Operations")
-            enable_row_filtering = st.checkbox("Filter Row", value=False)
-            enable_add_row = st.checkbox("Add Row", value=False)
-            enable_row_removal = st.checkbox("Remove Row", value=False)
-            
-            st.markdown("#### Value Operations")
-            enable_edit_values = st.checkbox("Edit Values", value=False)
-          
+        # Process uploaded file
         file_content = uploaded_file.getvalue()
         file_buffer = io.BytesIO(file_content)
         
         try:
-            xlsx = pd.ExcelFile(file_buffer)
-            sheet_names = xlsx.sheet_names
-            is_encrypted = False
-            decrypted_file = file_buffer
+            # Handle encrypted files
+            try:
+                xlsx = pd.ExcelFile(file_buffer)
+                sheet_names = xlsx.sheet_names
+                is_encrypted = False
+                decrypted_file = file_buffer
+                
+            except Exception as e:
+                if "file has been corrupted" in str(e) or "Workbook is encrypted" in str(e):
+                    is_encrypted = True
+                    
+                    st.warning("🔒 This file appears to be password protected.")
+                    excel_password = st.text_input("Enter Excel password", type="password")
+                    
+                    if not excel_password:
+                        st.stop()
+                    
+                    try:
+                        decrypted_file = io.BytesIO()
+                        office_file = msoffcrypto.OfficeFile(io.BytesIO(file_content))
+                        office_file.load_key(password=excel_password)
+                        office_file.decrypt(decrypted_file)
+                        decrypted_file.seek(0)
+                        xlsx = pd.ExcelFile(decrypted_file)
+                        sheet_names = xlsx.sheet_names
+                        st.success("✅ File decrypted successfully!")
+                    except Exception as decrypt_error:
+                        st.error(f"❌ Decryption failed: {str(decrypt_error)}")
+                        st.stop()
+                else:
+                    st.error(f"❌ Error reading file: {str(e)}")
+                    st.stop()
             
-        except Exception as e:
-            if "file has been corrupted" in str(e) or "Workbook is encrypted" in str(e):
-                is_encrypted = True
-                st.sidebar.warning("This file appears to be password protected.")
-                excel_password = st.sidebar.text_input("Enter Excel password", type="password")
-                
-                if not excel_password:
-                    st.warning("Please enter the Excel file password.")
-                    st.stop()
-                
-                try:
-                    decrypted_file = io.BytesIO()
-                    office_file = msoffcrypto.OfficeFile(io.BytesIO(file_content))
-                    office_file.load_key(password=excel_password)
-                    office_file.decrypt(decrypted_file)
+            # Sheet selection with improved UI
+            if len(sheet_names) > 1:
+                st.sidebar.markdown("<div class='section-header'>SELECT SHEET</div>", unsafe_allow_html=True)
+                selected_sheet = st.sidebar.selectbox(
+                    "",
+                    options=sheet_names,
+                    index=0,
+                    key=f"{campaign}_sheet_selector",
+                            )
+            else:
+                selected_sheet = sheet_names[0]
+        
+            try:
+                if is_encrypted:
                     decrypted_file.seek(0)
-                    xlsx = pd.ExcelFile(decrypted_file)
-                    sheet_names = xlsx.sheet_names
-                except Exception as decrypt_error:
-                    st.sidebar.error(f"Decryption failed: {str(decrypt_error)}")
-                    st.stop()
-            else:
-                st.sidebar.error(f"Error reading file: {str(e)}")
-                st.stop()
-        
-        if len(sheet_names) > 1 :
-            selected_sheet = st.sidebar.selectbox(
-                "Select Sheet", 
-                options=sheet_names,
-                index=0,
-                key=f"{campaign}_sheet_selector"
-            )
-        else:
-            selected_sheet = sheet_names[0]
-        
-        try:
-            if is_encrypted:
-                decrypted_file.seek(0)
-                df = pd.read_excel(decrypted_file, sheet_name=selected_sheet)
-            else:
-                df = pd.read_excel(xlsx, sheet_name=selected_sheet)
+                    df = pd.read_excel(decrypted_file, sheet_name=selected_sheet)
+                else:
+                    df = pd.read_excel(xlsx, sheet_name=selected_sheet)
                 
-            if selected_sheet and preview:
-                st.subheader(f"Preview of {selected_sheet}")
-                df_preview = df.copy().dropna(how='all').dropna(how='all', axis=1)
-                st.dataframe(df_preview, use_container_width=True)
+                if selected_sheet and preview:
+                    st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+                    st.subheader(f"Preview of {selected_sheet}")
+                    df_preview = df.copy().dropna(how='all').dropna(how='all', axis=1)
+                    st.dataframe(df_preview, use_container_width=True, height=400)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.error(f"❌ Error reading sheet: {str(e)}")
                 
         except Exception as e:
-            st.sidebar.error(f"Error reading sheet: {str(e)}")
+            st.error(f"❌ Error reading sheet: {str(e)}")
     
-    process_button = st.sidebar.button("Process File", type="primary", disabled=uploaded_file is None, key=f"{campaign}_process_button")
-
     if uploaded_file is not None:
         file_content = uploaded_file.getvalue() if hasattr(uploaded_file, 'getvalue') else uploaded_file.read()
         
@@ -1647,38 +1883,66 @@ def main():
             df = df.dropna(how='all', axis=0) 
             df = df.dropna(how='all', axis=1)
 
+            # Data manipulation sections with enhanced UI
             if enable_add_column:
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
                 st.subheader("Add New Columns")
-
+                
                 if "column_definitions" not in st.session_state:
                     st.session_state.column_definitions = []
 
                 with st.form("add_column_form", clear_on_submit=True):
-                    new_column_name = st.text_input("New Column Name")
-                    column_source_type = st.radio("Column Source", ["Input Value", "Copy From Column", "Excel-like Formula"], key="source_type")
+                    st.markdown("<div class='section-header'>NEW COLUMN DETAILS</div>", unsafe_allow_html=True)
+                    new_column_name = st.text_input("New Column Name", help="Enter a unique name for the new column")
+                    column_source_type = st.radio(
+                        "Column Source", 
+                        ["Input Value", "Copy From Column", "Excel-like Formula"], 
+                        key="source_type",
+                        help="Choose how to populate the new column"
+                    )
 
                     source_column = modification_type = prefix_text = suffix_text = selected_function = custom_function = formula = None
                     
                     if column_source_type == "Input Value":
-                        input_value = st.text_input("Value to fill in each row")
+                        input_value = st.text_input("Value to fill in each row", help="This value will be applied to all rows")
                     elif column_source_type == "Copy From Column":
-                        source_column = st.selectbox("Source Column (copy from)", df.columns.tolist(), key="source_column")
-                        modification_type = st.radio("Modification Type", ["Direct Copy", "Text Prefix", "Text Suffix", "Apply Function"], key="mod_type")
+                        source_column = st.selectbox(
+                            "Source Column (copy from)", 
+                            df.columns.tolist(), 
+                            key="source_column",
+                            help="Select the column to copy data from"
+                        )
+                        modification_type = st.radio(
+                            "Modification Type", 
+                            ["Direct Copy", "Text Prefix", "Text Suffix", "Apply Function"], 
+                            key="mod_type"
+                        )
 
                         if modification_type == "Text Prefix":
-                            prefix_text = st.text_input("Prefix to add")
+                            prefix_text = st.text_input("Prefix to add", help="Text to add before each value")
                         elif modification_type == "Text Suffix":
-                            suffix_text = st.text_input("Suffix to add")
+                            suffix_text = st.text_input("Suffix to add", help="Text to add after each value")
                         elif modification_type == "Apply Function":
                             function_options = ["To Uppercase", "To Lowercase", "Strip Spaces", "Custom Function"]
                             selected_function = st.selectbox("Select Function", function_options)
                             if selected_function == "Custom Function":
-                                custom_function = st.text_area("Custom function (use 'x')", value="lambda x: x")
+                                custom_function = st.text_area(
+                                    "Custom function (use 'x')", 
+                                    value="lambda x: x",
+                                    help="Write a lambda function, e.g., lambda x: x.upper()"
+                                )
                     else:
                         st.info("Use column names in curly braces {} and expressions (e.g. `{Amount} * 2`, etc.)")
-                        formula = st.text_area("Excel-like formula", height=80)
+                        formula = st.text_area(
+                            "Excel-like formula", 
+                            height=80,
+                            help="Example: {Column1} + {Column2} or IF({Amount} > 100, 'High', 'Low')"
+                        )
 
-                    submitted = st.form_submit_button("Add to List")
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        submitted = st.form_submit_button("Add to List", type="primary")
+                    
                     if submitted and new_column_name:
                         st.session_state.column_definitions.append({
                             "name": new_column_name,
@@ -1692,70 +1956,92 @@ def main():
                             "formula": formula,
                             "input_value": input_value if column_source_type == "Input Value" else None,
                         })
-                        st.success(f"Queued column: {new_column_name}")
+                        st.success(f"✅ Queued column: {new_column_name}")
+                        st.markdown(f"<span class='success-badge'>Added to queue</span>", unsafe_allow_html=True)
 
                 if st.session_state.column_definitions:
-                    st.write("🧾 Queued Columns to Add:")
+                    st.markdown("<div class='section-header'>QUEUED COLUMNS</div>", unsafe_allow_html=True)
                     for idx, col_def in enumerate(st.session_state.column_definitions):
-                        st.markdown(f"- **{col_def['name']}** from **{col_def['source']}**")
+                        st.markdown(
+                            f"- **{col_def['name']}** from **{col_def['source']}** "
+                            f"<span class='status-badge success-badge'>Pending</span>",
+                            unsafe_allow_html=True
+                        )
 
-                    if st.button("Apply All Column Additions"):
-                            
-                        try:
-                            for col_def in st.session_state.column_definitions:
-                                name = col_def["name"]
-                                source = col_def["source"]
-                                
-                                if source == "Input Value":
-                                    input_value = col_def["input_value"]
-                                    df[name] = input_value
-                                elif source == "Copy From Column":
-                                    source_col = col_def["source_column"]
-                                    mod_type = col_def["modification_type"]
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        if st.button("Apply All Column Additions", type="primary", use_container_width=True):
+                            try:
+                                for col_def in st.session_state.column_definitions:
+                                    name = col_def["name"]
+                                    source = col_def["source"]
+                                    
+                                    if source == "Input Value":
+                                        input_value = col_def["input_value"]
+                                        df[name] = input_value
+                                    elif source == "Copy From Column":
+                                        source_col = col_def["source_column"]
+                                        mod_type = col_def["modification_type"]
 
-                                    if mod_type == "Direct Copy":
-                                        df[name] = df[source_col]
-                                    elif mod_type == "Text Prefix":
-                                        df[name] = col_def["prefix_text"] + df[source_col].astype(str)
-                                    elif mod_type == "Text Suffix":
-                                        df[name] = df[source_col].astype(str) + col_def["suffix_text"]
-                                    elif mod_type == "Apply Function":
-                                        if col_def["function"] == "To Uppercase":
-                                            df[name] = df[source_col].astype(str).str.upper()
-                                        elif col_def["function"] == "To Lowercase":
-                                            df[name] = df[source_col].astype(str).str.lower()
-                                        elif col_def["function"] == "Strip Spaces":
-                                            df[name] = df[source_col].astype(str).str.strip()
-                                        elif col_def["function"] == "Custom Function":
-                                            func = eval(col_def["custom_function"])
-                                            df[name] = df[source_col].apply(func)
+                                        if mod_type == "Direct Copy":
+                                            df[name] = df[source_col]
+                                        elif mod_type == "Text Prefix":
+                                            df[name] = col_def["prefix_text"] + df[source_col].astype(str)
+                                        elif mod_type == "Text Suffix":
+                                            df[name] = df[source_col].astype(str) + col_def["suffix_text"]
+                                        elif mod_type == "Apply Function":
+                                            if col_def["function"] == "To Uppercase":
+                                                df[name] = df[source_col].astype(str).str.upper()
+                                            elif col_def["function"] == "To Lowercase":
+                                                df[name] = df[source_col].astype(str).str.lower()
+                                            elif col_def["function"] == "Strip Spaces":
+                                                df[name] = df[source_col].astype(str).str.strip()
+                                            elif col_def["function"] == "Custom Function":
+                                                func = eval(col_def["custom_function"])
+                                                df[name] = df[source_col].apply(func)
 
-                                elif source == "Excel-like Formula":
-                                    formula = col_def["formula"]
-                                    processed = formula
-                                    for col in df.columns:
-                                        pattern = r'\{' + re.escape(col) + r'\}'
-                                        processed = re.sub(pattern, f"df['{col}']", processed)
-                                    processed = processed.replace("IF(", "np.where(").replace("SUM(", "np.sum(")
-                                    processed = processed.replace("AVG(", "np.mean(").replace("MAX(", "np.max(").replace("MIN(", "np.min(")
-                                    df[name] = eval(processed)
+                                    elif source == "Excel-like Formula":
+                                        formula = col_def["formula"]
+                                        processed = formula
+                                        for col in df.columns:
+                                            pattern = r'\{' + re.escape(col) + r'\}'
+                                            processed = re.sub(pattern, f"df['{col}']", processed)
+                                        processed = processed.replace("IF(", "np.where(").replace("SUM(", "np.sum(")
+                                        processed = processed.replace("AVG(", "np.mean(").replace("MAX(", "np.max(").replace("MIN(", "np.min(")
+                                        df[name] = eval(processed)
 
-                            st.success("All queued columns added successfully!")
-                            st.session_state.renamed_df = df
-                            st.session_state.column_definitions.clear()
-                        except Exception as e:
-                            st.error(f"Error applying column additions: {str(e)}")
+                                st.success("✅ All queued columns added successfully!")
+                                st.markdown(f"<span class='success-badge'>Columns Applied</span>", unsafe_allow_html=True)
+                                st.session_state.renamed_df = df
+                                st.session_state.column_definitions.clear()
+                            except Exception as e:
+                                st.error(f"❌ Error applying column additions: {str(e)}")
+                                st.markdown(f"<span class='error-badge'>Failed</span>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
 
             if enable_column_removal:
-                st.subheader("Column Removal")
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+                st.subheader("Remove Columns")
                 cols = df.columns.tolist()
-                cols_to_remove = st.multiselect("Select columns to remove", cols)
+                cols_to_remove = st.multiselect(
+                    "Select columns to remove", 
+                    cols,
+                    help="Select one or more columns to remove from the dataset"
+                )
                 if cols_to_remove:
-                    df = df.drop(columns=cols_to_remove)
-                    st.success(f"Removed columns: {', '.join(cols_to_remove)}")
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        if st.button("Confirm Removal", type="primary", use_container_width=True):
+                            df = df.drop(columns=cols_to_remove)
+                            st.success(f"🗑️ Removed columns: {', '.join(cols_to_remove)}")
+                            st.markdown(f"<span class='success-badge'>Columns Removed</span>", unsafe_allow_html=True)
+                            st.session_state.renamed_df = df
+                st.markdown("</div>", unsafe_allow_html=True)
 
             if enable_column_renaming:
-                st.subheader("Column Renaming")
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+                st.subheader("Rename Columns")
                 
                 rename_df = pd.DataFrame({
                     "original_name": df.columns,
@@ -1772,91 +2058,144 @@ def main():
                     key="column_rename_editor"
                 )
                 
-                if st.button("Apply Column Renames", key="apply_multiple_renames"):
-                    rename_dict = {
-                        orig: new 
-                        for orig, new in zip(edited_df["original_name"], edited_df["new_name"]) 
-                        if orig != new
-                    }
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button("Apply Column Renames", type="primary", use_container_width=True):
+                        rename_dict = {
+                            orig: new 
+                            for orig, new in zip(edited_df["original_name"], edited_df["new_name"]) 
+                            if orig != new
+                        }
 
-                    if rename_dict:
-                        df = df.rename(columns=rename_dict)
-                        st.session_state["renamed_df"] = df
-                        st.success(f"Renamed {len(rename_dict)} column(s): {', '.join([f'{k} → {v}' for k, v in rename_dict.items()])}")
+                        if rename_dict:
+                            df = df.rename(columns=rename_dict)
+                            st.session_state["renamed_df"] = df
+                            st.success(f"✏️ Renamed {len(rename_dict)} column(s): {', '.join([f'{k} → {v}' for k, v in rename_dict.items()])}")
+                            st.markdown(f"<span class='success-badge'>Columns Renamed</span>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
 
             if enable_row_filtering:
-                st.subheader("Row Filtering")
-                filter_col = st.selectbox("Select column to filter by", df.columns.tolist())
-                filter_value = st.text_input("Enter search/filter value")
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+                st.subheader("Filter Rows")
+                filter_col = st.selectbox(
+                    "Select column to filter by", 
+                    df.columns.tolist(),
+                    help="Choose the column to apply the filter on"
+                )
+                filter_value = st.text_input(
+                    "Enter search/filter value",
+                    help="Enter a value to filter rows (case-insensitive for text)"
+                )
                 
                 if filter_value and filter_col:
-                    if pd.api.types.is_numeric_dtype(df[filter_col]):
-                        try:
-                            filter_value_num = float(filter_value)
-                            filtered_df = df[df[filter_col] == filter_value_num]
-                        except ValueError:
-                            st.warning("Entered value is not numeric. Using string comparison instead.")
+                    try:
+                        if pd.api.types.is_numeric_dtype(df[filter_col]):
+                            try:
+                                filter_value_num = float(filter_value)
+                                filtered_df = df[df[filter_col] == filter_value_num]
+                            except ValueError:
+                                st.warning("⚠️ Entered value is not numeric. Using string comparison instead.")
+                                filtered_df = df[df[filter_col].astype(str).str.contains(filter_value, case=False, na=False)]
+                        else:
                             filtered_df = df[df[filter_col].astype(str).str.contains(filter_value, case=False, na=False)]
-                    else:
-                        filtered_df = df[df[filter_col].astype(str).str.contains(filter_value, case=False, na=False)]
 
-                    st.write(f"Found {len(filtered_df)} rows matching filter: '{filter_value}' in column '{filter_col}'")
-                    df = filtered_df
-                    
+                        st.markdown(
+                            f"<span class='status-badge success-badge'>Found {len(filtered_df)} rows matching filter: '{filter_value}' in column '{filter_col}'</span>",
+                            unsafe_allow_html=True
+                        )
+                        st.dataframe(filtered_df.head(10), use_container_width=True)
+                        df = filtered_df
+                        st.session_state.renamed_df = df
+                    except Exception as e:
+                        st.error(f"❌ Error filtering rows: {str(e)}")
+                        st.markdown(f"<span class='error-badge'>Filter Failed</span>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
+
             if enable_add_row:
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
                 st.subheader("Add New Rows")
                 with st.form("add_row_form"):
+                    st.markdown("<div class='section-header'>ROW DATA</div>", unsafe_allow_html=True)
                     row_data = {}
                     for col in df.columns:
-                        row_data[col] = st.text_input(f"Value for {col}", "")
+                        row_data[col] = st.text_input(f"Value for {col}", help=f"Enter value for {col}")
                     
-                    add_row_submitted = st.form_submit_button("Add Row")
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        add_row_submitted = st.form_submit_button("Add Row", type="primary")
                     
                     if add_row_submitted:
                         new_row = pd.DataFrame([row_data])
                         df = pd.concat([df, new_row], ignore_index=True)
-                        st.success("Row added successfully!")
-                        st.session_state["renamed_df"] = df
+                        st.success("✅ Row added successfully!")
+                        st.markdown(f"<span class='success-badge'>Row Added</span>", unsafe_allow_html=True)
+                        st.session_state.renamed_df = df
+                
+                st.markdown("</div>", unsafe_allow_html=True)
 
             if enable_row_removal:
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
                 st.subheader("Remove Rows")
                 st.info("Select rows to remove by index")
                 
                 with st.form("remove_row_form"):
-                    row_indices = st.multiselect("Select row indices to remove", 
-                                                options=list(range(len(df))),
-                                                format_func=lambda x: f"Row {x}")
+                    row_indices = st.multiselect(
+                        "Select row indices to remove", 
+                        options=list(range(len(df))),
+                        format_func=lambda x: f"Row {x}",
+                        help="Select one or more rows to remove"
+                    )
                     
-                    remove_rows_submitted = st.form_submit_button("Remove Selected Rows")
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        remove_rows_submitted = st.form_submit_button("Remove Selected Rows", type="primary")
                     
                     if remove_rows_submitted and row_indices:
                         df = df.drop(index=row_indices).reset_index(drop=True)
-                        st.success(f"Removed {len(row_indices)} row(s)")
-                        st.session_state["renamed_df"] = df
+                        st.success(f"🗑️ Removed {len(row_indices)} row(s)")
+                        st.markdown(f"<span class='success-badge'>Rows Removed</span>", unsafe_allow_html=True)
+                        st.session_state.renamed_df = df
+                
+                st.markdown("</div>", unsafe_allow_html=True)
 
             if enable_edit_values:
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
                 st.subheader("Edit Values")
                 
                 edited_df = st.data_editor(
                     df,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key="value_editor"
+                    key="value_editor",
+                    column_config={
+                        col: st.column_config.TextColumn(col, help=f"Edit values in {col}")
+                        for col in df.columns
+                    }
                 )
                 
-                if st.button("Apply Value Changes"):
-                    st.session_state["renamed_df"] = edited_df
-                    st.success("Value changes applied!")
-                    
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button("Apply Value Changes", type="primary", use_container_width=True):
+                        st.session_state["renamed_df"] = edited_df
+                        st.success("✅ Value changes applied!")
+                        st.markdown(f"<span class='success-badge'>Values Updated</span>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
+
             if enable_add_column or enable_column_removal or enable_column_renaming or enable_row_filtering or enable_add_row or enable_row_removal or enable_edit_values:
                 buffer = io.BytesIO()
                 df.to_excel(buffer, index=False, engine='openpyxl')
                 file_content = buffer.getvalue()
+                st.markdown("<div class='stCard'>", unsafe_allow_html=True)
                 st.subheader("Modified Data Preview")
-                st.dataframe(df.head(10), use_container_width=True)
+                st.dataframe(df.head(10), use_container_width=True, height=300)
+                st.markdown("</div>", unsafe_allow_html=True)
 
         except Exception as e:
-            st.error(f"Error loading or manipulating file: {str(e)}")
+            st.error(f"❌ Error loading or manipulating file: {str(e)}")
+            st.markdown(f"<span class='error-badge'>Error</span>", unsafe_allow_html=True)
 
         if "renamed_df" in st.session_state:
             df = st.session_state["renamed_df"]
@@ -1866,8 +2205,9 @@ def main():
             file_content = buffer.getvalue()
 
         if process_button and selected_sheet:
-            try:
-                with st.spinner("Processing file..."):
+            st.markdown("<div class='stCard'>", unsafe_allow_html=True)
+            with st.spinner("Processing file..."):
+                try:
                     if automation_type == "Cured List":
                         result = processor.process_cured_list(
                             file_content, 
@@ -1881,16 +2221,38 @@ def main():
                         with tabs[0]:
                             st.subheader("Remarks Data")
                             st.dataframe(result['remarks_df'], use_container_width=True)
-                            st.download_button(label="Download Remarks File", data=result['remarks_binary'], file_name=result['remarks_filename'], mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                            st.download_button(
+                                label="Download Remarks File", 
+                                data=result['remarks_binary'], 
+                                file_name=result['remarks_filename'], 
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                type="primary",
+                                use_container_width=True
+                            )
                         with tabs[1]:
                             st.subheader("Reshuffle Data")
                             st.dataframe(result['others_df'], use_container_width=True)
-                            st.download_button(label="Download Reshuffle File", data=result['others_binary'], file_name=result['others_filename'], mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                            st.download_button(
+                                label="Download Reshuffle File", 
+                                data=result['others_binary'], 
+                                file_name=result['others_filename'], 
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                type="primary",
+                                use_container_width=True
+                            )
                         with tabs[2]:
                             st.subheader("Payments Data")
                             st.dataframe(result['payments_df'], use_container_width=True)
-                            st.download_button(label="Download Payments File", data=result['payments_binary'], file_name=result['payments_filename'], mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                        st.success("Cured List processed successfully!")
+                            st.download_button(
+                                label="Download Payments File", 
+                                data=result['payments_binary'], 
+                                file_name=result['payments_filename'], 
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                type="primary",
+                                use_container_width=True
+                            )
+                        st.success("✅ Cured List processed successfully!")
+                        st.markdown(f"<span class='success-badge'>Processing Complete</span>", unsafe_allow_html=True)
                     else:
                         if automation_type == "Data Clean":
                             result_df, output_binary, output_filename = getattr(processor, automation_map[automation_type])(
@@ -1910,7 +2272,7 @@ def main():
                                 remove_duplicates=remove_duplicates, 
                                 remove_blanks=remove_blanks, 
                                 trim_spaces=trim_spaces,
-                                report_date = report_date
+                                report_date=report_date
                             )
                         else:
                             result_df, output_binary, output_filename = getattr(processor, automation_map[automation_type])(
@@ -1931,22 +2293,29 @@ def main():
                             st.session_state['result_sheet_names'] = result_sheet_names
                         
                         else:
-                            st.error("No output file was generated")
-                        
+                            st.error("❌ No output file was generated")
+                            st.markdown(f"<span class='error-badge'>Error</span>", unsafe_allow_html=True)
 
+                except Exception as e:
+                    st.error(f"❌ Error processing file: {str(e)}")
+                    st.markdown(f"<span class='error-badge'>Processing Failed</span>", unsafe_allow_html=True)
+                    with st.expander("See error details"):
+                        st.code(traceback.format_exc())
+                
                 if "renamed_df" in st.session_state:
                     st.session_state.pop("renamed_df", None)
-
-            except Exception as e:
-                st.error(f"Error processing file: {str(e)}")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
 
         if 'output_binary' in st.session_state and 'result_sheet_names' in st.session_state:
+            st.markdown("<div class='stCard'>", unsafe_allow_html=True)
             excel_file = pd.ExcelFile(io.BytesIO(st.session_state['output_binary']))
             result_sheet_names = st.session_state['result_sheet_names']
             
             if len(result_sheet_names) > 1:
+                st.markdown("<div class='section-header'>SELECT OUTPUT SHEET</div>", unsafe_allow_html=True)
                 result_sheet = st.selectbox(
-                    "Select Sheet",
+                    "",
                     options=result_sheet_names,
                     index=0,
                     key=f"{campaign}_result_sheet"
@@ -1956,18 +2325,29 @@ def main():
             
             selected_df = pd.read_excel(io.BytesIO(st.session_state['output_binary']), sheet_name=result_sheet)
             
-            st.subheader("Processed Preview")
-            st.dataframe(selected_df, use_container_width=True)
+            st.subheader("Processed Data Preview")
+            st.dataframe(selected_df, use_container_width=True, height=400)
             
-            st.download_button(
-                label="Download File", 
-                data=st.session_state['output_binary'], 
-                file_name=st.session_state['output_filename'], 
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            st.success(f"File processed successfully! Download '{st.session_state['output_filename']}'")
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("© 2025 Automation Tool")
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                st.download_button(
+                    label="Download Processed File", 
+                    data=st.session_state['output_binary'], 
+                    file_name=st.session_state['output_filename'], 
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary",
+                    use_container_width=True
+                )
+            st.success(f"✅ File processed successfully! Download '{st.session_state['output_filename']}'")
+            st.markdown(f"<span class='success-badge'>Ready for Download</span>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='text-align: center; color: #666; font-size: 0.9rem;'>© 2025 Automation Tool | Powered by Streamlit</p>",
+        unsafe_allow_html=True
+    )
 
 if __name__ == "__main__":
     main()
